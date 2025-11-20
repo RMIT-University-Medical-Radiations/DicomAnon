@@ -6,7 +6,11 @@ from PyQt6.QtCore import Qt
 from pydicom import dcmread
 import pandas as pd
 from os.path import expanduser
-from datetime import datetime
+from datetime import datetime, timedelta
+from pydicom.dataset import Dataset
+from pydicom.uid import generate_uid
+from pydicom.multival import MultiValue
+
 
 StyleSheet = '''
 #BlueProgressBar {
@@ -19,6 +23,76 @@ StyleSheet = '''
     margin: 0.5px;
 }
 '''
+
+
+# Identifying attributes to blank/remove (excluding PatientName/PatientID)
+IDENTIFYING_KEYWORDS = {
+    # Patient (except PatientName, PatientID)
+    "OtherPatientIDs",
+    "OtherPatientNames",
+    "PatientBirthName",
+    "PatientMotherBirthName",
+    "PatientAddress",
+    "PatientTelephoneNumbers",
+    "PatientInsurancePlanCodeSequence",
+    "PatientComments",
+    "EthnicGroup",
+    "Occupation",
+    "AdditionalPatientHistory",
+    "PatientReligiousPreference",
+
+    # General person/organization
+    "ResponsiblePerson",
+    "ResponsiblePersonRole",
+    "PersonName",
+    "PerformingPhysicianName",
+    "ReferringPhysicianName",
+    "ReferringPhysicianAddress",
+    "ReferringPhysicianTelephoneNumbers",
+    "RequestingPhysician",
+    "OperatorsName",
+    "PhysiciansOfRecord",
+    "PhysiciansReadingStudy",
+
+    # Institution / contact info
+    "InstitutionName",
+    "InstitutionAddress",
+    "InstitutionalDepartmentName",
+    "StationName",
+    "DeviceSerialNumber",
+    "SoftwareVersions",
+
+    # Study / scheduling / admin IDs
+    "AccessionNumber",
+    "IssuerOfPatientID",
+    "IssuerOfAccessionNumberSequence",
+    "RequestingService",
+    "AdmissionID",
+    "PatientAccountNumber",
+    "InsurancePlanIdentification",
+    "VisitComments",
+    "ScheduledProcedureStepDescription",
+    "RequestedProcedureDescription",
+    "RequestedProcedureID",
+    "RequestedProcedureLocation",
+
+    # Free-text descriptions
+    "ProtocolName",
+    "PerformedProcedureStepDescription",
+    "StudyComments",
+
+    # Addresses / geographic
+    "CountryOfResidence",
+    "RegionOfResidence",
+    "PatientMotherBirthName",
+}
+
+UID_KEYWORDS = {
+    "StudyInstanceUID",
+    "SeriesInstanceUID",
+    "SOPInstanceUID",
+    "FrameOfReferenceUID",
+}
 
 class DicomAnonWidget(QWidget):
     def __init__(self):
@@ -78,22 +152,134 @@ class DicomAnonWidget(QWidget):
         self.activateWindow()
         self.raise_()
 
-    def anonymise_image(self, image, name):
-        # update the personal fields
-        image.PatientName = name
-        image.PatientID = name
-        image.PatientAddress = 'Anonymised'
-        image.PatientMotherBirthName = 'Anonymised'
-        image.EthnicGroup = 'Anonymised'
-        image.PatientIdentityRemoved = 'YES'
+    def _shift_study_date(self, ds: Dataset, offset_days: int) -> None:
+        """
+        Shift StudyDate by a fixed number of days.
 
-        image.ReferringPhysicianName = 'Anonymised'
-        image.ReferringPhysicianAddress = 'Anonymised'
+        Using the same offset for all studies preserves the exact
+        day differences between any two StudyDates.
+        """
+        s = getattr(ds, "StudyDate", None)
+        if not (s and len(s) == 8):
+            return
+        try:
+            dt = datetime.strptime(s, "%Y%m%d").date()
+            dt_new = dt + timedelta(days=offset_days)
+            ds.StudyDate = dt_new.strftime("%Y%m%d")
+        except Exception:
+            # If parsing fails, leave as-is
+            pass
 
-        # remove private data elements, as there is no guarantee as to what kind of information might be contained in them
-        image.remove_private_tags()
+    def _anonymise_birthdate(self, ds: Dataset) -> None:
+        """Replace PatientBirthDate but keep the year."""
+        b = getattr(ds, "PatientBirthDate", None)
+        if not (b and len(b) == 8):
+            return
+        year = b[:4]
+        ds.PatientBirthDate = f"{year}0101"
 
-        return image
+    def _map_uid(self, old_uid: str, uid_map: dict) -> str:
+        """Return a pseudonymised UID, creating a new one if needed."""
+        if not old_uid:
+            return old_uid
+        if old_uid not in uid_map:
+            uid_map[old_uid] = generate_uid()
+        return uid_map[old_uid]
+
+    def _anonymise_uids_recursive(self, ds: Dataset, uid_map: dict) -> None:
+        """
+        Recursively remap all UIDs in the dataset (and sequences),
+        except SOPClassUIDs (those are class identifiers, not object IDs).
+        """
+        for elem in ds.iterall():
+            if elem.VR != "UI":
+                continue
+
+            keyword = elem.keyword or ""
+            # Don't touch SOP Class UIDs
+            if keyword.endswith("SOPClassUID"):
+                continue
+
+            val = elem.value
+            if isinstance(val, MultiValue):
+                elem.value = [ self._map_uid(str(v), uid_map) for v in val ]
+            else:
+                elem.value = self._map_uid(str(val), uid_map)
+
+    def _get_study_label(self, ds: Dataset, study_label_map: dict) -> str:
+        """
+        Give each original StudyInstanceUID a stable pseudonym like STUDY_0001
+        for StudyID. StudyDescription is left unchanged.
+        """
+        study_uid = getattr(ds, "StudyInstanceUID", None)
+        if not study_uid:
+            return "STUDY"
+        if study_uid not in study_label_map:
+            idx = len(study_label_map) + 1
+            study_label_map[study_uid] = f"STUDY_{idx:04d}"
+        return study_label_map[study_uid]
+
+    def anonymise_dicom(
+        self,
+        ds: Dataset,
+        anon_name: str,
+        uid_map: dict | None = None,
+        study_label_map: dict | None = None,
+    ) -> Dataset:
+        """
+        Anonymise a DICOM dataset in place for hospital→research sharing.
+
+        - PatientName, PatientID → anon_name
+        - PatientBirthDate → same year, set to YYYY0101
+        - StudyDate → add 1 month
+        - Private tags removed
+        - Other identifying attributes blanked
+        - UIDs pseudonymised consistently using uid_map
+        - StudyID pseudonymised using study_label_map
+        - StudyDescription is NOT changed
+        """
+        if uid_map is None:
+            uid_map = {}
+        if study_label_map is None:
+            study_label_map = {}
+
+        # dates
+        self._anonymise_birthdate(ds)
+        self._shift_study_date(ds, offset_days=30)
+
+        # remove private tags
+        ds.remove_private_tags()
+
+        # pseudonymised PatientName / PatientID
+        ds.PatientName = anon_name
+        ds.PatientID = anon_name
+
+        # pseudonymised StudyID only (for grouping); StudyDescription left as-is
+        study_label = self._get_study_label(ds, study_label_map)
+        ds.StudyID = study_label
+        # ds.StudyDescription is intentionally NOT modified
+
+        # blank other identifying tags
+        for kw in IDENTIFYING_KEYWORDS:
+            if kw in ds:
+                elem = ds.data_element(kw)
+                if elem.VR == "SQ":
+                    elem.value = []
+                else:
+                    elem.value = ""
+
+        # pseudonymise UIDs (dataset and nested sequences)
+        self._anonymise_uids_recursive(ds, uid_map)
+
+        # file meta UIDs (keep SOP Class, map instance UID)
+        if hasattr(ds, "file_meta") and ds.file_meta:
+            fm = ds.file_meta
+            if "MediaStorageSOPInstanceUID" in fm:
+                fm["MediaStorageSOPInstanceUID"].value = self._map_uid(
+                    str(fm["MediaStorageSOPInstanceUID"].value), uid_map
+                )
+
+        return ds
 
     # look at the mapping file and determine the next ID to use
     def get_anon_patient_id(self, patient_id, mapping_df):
@@ -129,6 +315,9 @@ class DicomAnonWidget(QWidget):
         self.status_label.setText('Found {} files.'.format(dicom_files_count))
         # process GUI events to reflect the update value
         QApplication.processEvents()
+        # initialise maps
+        uid_map = {}
+        study_label_map = {}
         # find the patient directories
         patient_dirs_l = [ name for name in os.listdir(source_base_dir) if os.path.isdir(os.path.join(source_base_dir, name)) ]
         for patient_dir_idx,patient_dir in enumerate(patient_dirs_l):
@@ -157,7 +346,7 @@ class DicomAnonWidget(QWidget):
                     print(e)
                     invalid_file_count += 1
                 else:
-                    ds = self.anonymise_image(image=ds, name=anon_patient_folder_name)
+                    ds = self.anonymise_dicom(ds=ds, anon_name=anon_patient_folder_name, uid_map=uid_map, study_label_map=study_label_map)
                     # create the anon folder if it doesn't exist
                     target_dir = os.path.dirname(anon_patient_file)  # create the missing directories all the way to the DICOM file
                     if not os.path.exists(target_dir):
