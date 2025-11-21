@@ -5,7 +5,7 @@ After telling DicomAnon where you want the anonymised files to be placed, it wil
 
 <img width="712" alt="DicomAnon screen shot" src="https://github.com/RMIT-University-Medical-Radiations/DicomAnon/assets/1016303/742f9e86-d083-413f-9635-909e5964eb2e">
 
-The DICOM files are anonymised by replacing the values of the following DICOM tags:
+The DICOM files are anonymised by blanking the values of the following DICOM tags:
 
 ### Patient
 * PatientName - replaced with `Brain-<anon_patient_ID>`
@@ -70,6 +70,9 @@ The DICOM files are anonymised by replacing the values of the following DICOM ta
 * RegionOfResidence
 * PatientMotherBirthName
 
+
+The tag `PatientBirthDate` is modified but the year is preserved. The `StudyDate` tag is shifted by a fixed number of days so that the time period between studies is preserved.
+
 Further, it recursively remaps all UIDs in the dataset (and sequences), except SOPClassUIDs. The reason for doing this is so that even if the anoymised DICOMs are loaded back into the system at their originating institution, the patient could still not be identified.
 
 On completion, DicomAnon will save as an Excel spreadsheet in your home folder a mapping of the true patient IDs to anonymised patient IDs.
@@ -80,8 +83,8 @@ Note that adding new patient folders (and updates to existing patient folders) w
 Unzip the downloaded file and move it to a convenient place, alongside your other utility applications.
 
 ## Usage
-1. Start the application and select the parent folder of the patient folders containing the DICOM files to be anonymised (i.e. the 'source' folder)
-2. Select the destination folder that will contain the anonymised DICOM files (i.e. the 'destination' folder). Create a new destination folder if you wish.
-3. Press the Anonymise! button.
+1. Start the application and select the parent folder of the patient folders containing the DICOM files to be anonymised (i.e. the `source` folder)
+2. Select the destination folder that will contain the anonymised DICOM files (i.e. the `destination` folder). Create a new destination folder if you wish.
+3. Press the `Anonymise!` button.
 4. Wait for the processing to complete. The progress bar provides a visual clue about how far along it is.
 5. On completion, an Excel spreadsheet with the mapping from the real patient ID to the anonymised patient ID will be saved in your home directory.
