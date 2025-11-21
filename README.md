@@ -6,6 +6,11 @@ After telling DicomAnon where you want the anonymised files to be placed, it wil
 <img width="712" alt="DicomAnon screen shot" src="https://github.com/RMIT-University-Medical-Radiations/DicomAnon/assets/1016303/742f9e86-d083-413f-9635-909e5964eb2e">
 
 The DICOM files are anonymised by replacing the values of the following DICOM tags:
+
+### Patient
+* PatientName - replaced with `Brain-<anon_patient_ID>`
+* PatientID - replaced with `Brain-<anon_patient_ID>`
+
 ### Patient (except PatientName, PatientID)
 * OtherPatientIDs
 * OtherPatientNames
