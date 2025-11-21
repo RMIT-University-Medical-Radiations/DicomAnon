@@ -418,7 +418,8 @@ class DicomAnonWidget(QWidget):
             # update the status bar
             self.status_label.setText('Saving the ID mapping file.')
             # update the mapping file
-            mapping_df.to_excel(mapping_file)
+            if mapping_df is not None:
+                mapping_df.to_excel(mapping_file)
             # process UI events
             QApplication.processEvents()
             # enable buttons
