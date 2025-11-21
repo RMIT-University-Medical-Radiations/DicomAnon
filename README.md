@@ -4,7 +4,7 @@ This is a repository for a DICOM anonymiser, deftly named DicomAnon. Although th
 <img width="712" alt="DicomAnon screen shot" src="https://github.com/RMIT-University-Medical-Radiations/DicomAnon/assets/1016303/742f9e86-d083-413f-9635-909e5964eb2e">
 
 The DICOM files are anonymised by replacing the values of the following DICOM tags:
-## Patient (except PatientName, PatientID)
+### Patient (except PatientName, PatientID)
 * OtherPatientIDs
 * OtherPatientNames
 * PatientBirthName
@@ -18,7 +18,7 @@ The DICOM files are anonymised by replacing the values of the following DICOM ta
 * AdditionalPatientHistory
 * PatientReligiousPreference
 
-## General person/organization
+### General person/organization
 * ResponsiblePerson
 * ResponsiblePersonRole
 * PersonName
@@ -31,7 +31,7 @@ The DICOM files are anonymised by replacing the values of the following DICOM ta
 * PhysiciansOfRecord
 * PhysiciansReadingStudy
 
-## Institution / contact info
+### Institution / contact info
 * InstitutionName
 * InstitutionAddress
 * InstitutionalDepartmentName
@@ -39,7 +39,7 @@ The DICOM files are anonymised by replacing the values of the following DICOM ta
 * DeviceSerialNumber
 * SoftwareVersions
 
-## Study / scheduling / admin IDs
+### Study / scheduling / admin IDs
 * AccessionNumber
 * IssuerOfPatientID
 * IssuerOfAccessionNumberSequence
@@ -53,12 +53,12 @@ The DICOM files are anonymised by replacing the values of the following DICOM ta
 * RequestedProcedureID
 * RequestedProcedureLocation
 
-## Free-text descriptions
+### Free-text descriptions
 * ProtocolName
 * PerformedProcedureStepDescription
 * StudyComments
 
-## Addresses / geographic
+### Addresses / geographic
 * CountryOfResidence
 * RegionOfResidence
 * PatientMotherBirthName
