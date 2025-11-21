@@ -73,7 +73,7 @@ The DICOM files are anonymised by blanking the values of the following DICOM tag
 
 The tag `PatientBirthDate` is modified but the year is preserved. The `StudyDate` tag is shifted by a fixed number of days so that the time period between studies is preserved.
 
-Further, it recursively remaps all UIDs in the dataset (and sequences), except SOPClassUIDs. The reason for doing this is so that even if the anoymised DICOMs are loaded back into the system at their originating institution, the patient could still not be identified.
+Further, it recursively remaps all UIDs in the dataset (and sequences), except SOPClassUIDs. The reason for doing this is so that even if the anonymised DICOMs are loaded back into the system at their originating institution, the patient could still not be identified.
 
 On completion, DicomAnon will save as an Excel spreadsheet in your home folder a mapping of the true patient IDs to anonymised patient IDs.
 
