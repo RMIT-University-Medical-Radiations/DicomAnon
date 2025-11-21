@@ -25,7 +25,7 @@ The DICOM files are anonymised by replacing the values of the following DICOM ta
 * AdditionalPatientHistory
 * PatientReligiousPreference
 
-### General person/organization
+### General person/organisation
 * ResponsiblePerson
 * ResponsiblePersonRole
 * PersonName
