@@ -305,6 +305,13 @@ class DicomAnonWidget(QWidget):
 
         return int(patient_str)
 
+    def _display_error(self, message):
+        msg = QMessageBox()
+        msg.setIcon(QMessageBox.Icon.Warning)
+        msg.setText(message)
+        msg.setWindowTitle("Error")
+        msg.exec()
+
     # process all DICOMs under the selected top-level folder containing patient folders
     def process_folder(self, source_base_dir, destination_base_dir, mapping_df):
         # update the status bar
@@ -324,71 +331,70 @@ class DicomAnonWidget(QWidget):
         study_label_map = {}
         # find the patient directories
         patient_dirs_l = [ name for name in os.listdir(source_base_dir) if os.path.isdir(os.path.join(source_base_dir, name)) ]
-        for patient_dir_idx,patient_dir in enumerate(patient_dirs_l):
-            valid_file_count = 0
-            invalid_file_count = 0
-            try:
-                patient_id = self._parse_patient_id(patient_dir)
-            except Exception as e:
-                msg = QMessageBox()
-                msg.setIcon(QMessageBox.Icon.Warning)
-                msg.setText(f"Error parsing patient ID: {e}")
-                msg.setWindowTitle("Error")
-                msg.exec()
-                break
-            new_patient, anon_patient_id = self.get_anon_patient_id(patient_id, mapping_df)
-            anon_patient_folder_name = 'Brain-{:04d}'.format(anon_patient_id)
-            anon_patient_dir = destination_base_dir + os.sep + anon_patient_folder_name
-            patient_full_dir = source_base_dir + os.sep + patient_dir
-            dicom_files = glob.glob('{}/**/*.dcm'.format(patient_full_dir), recursive=True)
-            # update the status bar
-            self.status_label.setText('Processing patient ID {}'.format(patient_id))
-            # process GUI events to reflect the update value
-            QApplication.processEvents()
-            for source_file in dicom_files:
-                rel_path = os.path.relpath(source_file, patient_full_dir)  # use the same relative path for source and target
-                anon_patient_file = anon_patient_dir + os.sep + rel_path   # add the relative path to the 'Brain-nnnn' directory
-                # load and process the file
+        if len(patient_dirs_l) == 0:
+            self._display_error(f'There are no patient directories under {source_base_dir}')
+        else:
+            for patient_dir_idx,patient_dir in enumerate(patient_dirs_l):
+                valid_file_count = 0
+                invalid_file_count = 0
                 try:
-                    ds = dcmread(source_file)
-                    valid_file_count += 1
-                    # process GUI events
-                    QApplication.processEvents()
+                    patient_id = self._parse_patient_id(patient_dir)
                 except Exception as e:
-                    print(e)
-                    invalid_file_count += 1
-                else:
-                    ds = self.anonymise_dicom(ds=ds, anon_name=anon_patient_folder_name, uid_map=uid_map, study_label_map=study_label_map)
-                    # create the anon folder if it doesn't exist
-                    target_dir = os.path.dirname(anon_patient_file)  # create the missing directories all the way to the DICOM file
-                    if not os.path.exists(target_dir):
-                        os.makedirs(target_dir)
-                    ds.save_as(anon_patient_file)
-                # update count of files processed
-                dicom_files_processed += 1
-                # update the progress bar
-                proportion_completed = int((dicom_files_processed)/dicom_files_count*100)
-                self.pbar.setValue(proportion_completed)
+                    self._display_error(f"Error parsing patient ID: {e}")
+                    break
+                new_patient, anon_patient_id = self.get_anon_patient_id(patient_id, mapping_df)
+                anon_patient_folder_name = 'Brain-{:04d}'.format(anon_patient_id)
+                anon_patient_dir = destination_base_dir + os.sep + anon_patient_folder_name
+                patient_full_dir = source_base_dir + os.sep + patient_dir
+                dicom_files = glob.glob('{}/**/*.dcm'.format(patient_full_dir), recursive=True)
+                # update the status bar
+                self.status_label.setText('Processing patient ID {}'.format(patient_id))
                 # process GUI events to reflect the update value
                 QApplication.processEvents()
-            # count the total sessions anonymised for this patient
-            anon_patient_sessions_l = [ name for name in os.listdir(anon_patient_dir) if os.path.isdir(os.path.join(anon_patient_dir, name)) ]
-            session_count = len(anon_patient_sessions_l)
-            # update the status bar
-            self.status_label.setText('Updating the patient ID mapping.')
-            # process GUI events to reflect the update value
-            QApplication.processEvents()
-            # add or update the mapping
-            date_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            if new_patient:
-                row = pd.Series({'patient_id':patient_id, 'anon_patient_dir_name':anon_patient_folder_name, 'anon_patient_id':anon_patient_id, 'total_session_count':session_count, 'valid_file_count':valid_file_count, 'invalid_file_count':invalid_file_count, 'last_updated':date_str})
-                mapping_df = pd.concat([mapping_df, pd.DataFrame([row], columns=row.index)]).reset_index(drop=True)
-            else:
-                row_index = mapping_df.loc[mapping_df['patient_id'] == patient_id].index[0]
-                mapping_df.loc[row_index, 'total_session_count'] = session_count
-                mapping_df.loc[row_index, 'last_updated'] = date_str
-                mapping_df.loc[row_index, 'valid_file_count'] += valid_file_count
-                mapping_df.loc[row_index, 'invalid_file_count'] += invalid_file_count
+                for source_file in dicom_files:
+                    rel_path = os.path.relpath(source_file, patient_full_dir)  # use the same relative path for source and target
+                    anon_patient_file = anon_patient_dir + os.sep + rel_path   # add the relative path to the 'Brain-nnnn' directory
+                    # load and process the file
+                    try:
+                        ds = dcmread(source_file)
+                        valid_file_count += 1
+                        # process GUI events
+                        QApplication.processEvents()
+                    except Exception as e:
+                        print(e)
+                        invalid_file_count += 1
+                    else:
+                        ds = self.anonymise_dicom(ds=ds, anon_name=anon_patient_folder_name, uid_map=uid_map, study_label_map=study_label_map)
+                        # create the anon folder if it doesn't exist
+                        target_dir = os.path.dirname(anon_patient_file)  # create the missing directories all the way to the DICOM file
+                        if not os.path.exists(target_dir):
+                            os.makedirs(target_dir)
+                        ds.save_as(anon_patient_file)
+                    # update count of files processed
+                    dicom_files_processed += 1
+                    # update the progress bar
+                    proportion_completed = int((dicom_files_processed)/dicom_files_count*100)
+                    self.pbar.setValue(proportion_completed)
+                    # process GUI events to reflect the update value
+                    QApplication.processEvents()
+                # count the total sessions anonymised for this patient
+                anon_patient_sessions_l = [ name for name in os.listdir(anon_patient_dir) if os.path.isdir(os.path.join(anon_patient_dir, name)) ]
+                session_count = len(anon_patient_sessions_l)
+                # update the status bar
+                self.status_label.setText('Updating the patient ID mapping.')
+                # process GUI events to reflect the update value
+                QApplication.processEvents()
+                # add or update the mapping
+                date_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                if new_patient:
+                    row = pd.Series({'patient_id':patient_id, 'anon_patient_dir_name':anon_patient_folder_name, 'anon_patient_id':anon_patient_id, 'total_session_count':session_count, 'valid_file_count':valid_file_count, 'invalid_file_count':invalid_file_count, 'last_updated':date_str})
+                    mapping_df = pd.concat([mapping_df, pd.DataFrame([row], columns=row.index)]).reset_index(drop=True)
+                else:
+                    row_index = mapping_df.loc[mapping_df['patient_id'] == patient_id].index[0]
+                    mapping_df.loc[row_index, 'total_session_count'] = session_count
+                    mapping_df.loc[row_index, 'last_updated'] = date_str
+                    mapping_df.loc[row_index, 'valid_file_count'] += valid_file_count
+                    mapping_df.loc[row_index, 'invalid_file_count'] += invalid_file_count
 
         return mapping_df
 
