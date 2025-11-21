@@ -87,13 +87,6 @@ IDENTIFYING_KEYWORDS = {
     "PatientMotherBirthName",
 }
 
-UID_KEYWORDS = {
-    "StudyInstanceUID",
-    "SeriesInstanceUID",
-    "SOPInstanceUID",
-    "FrameOfReferenceUID",
-}
-
 class DicomAnonWidget(QWidget):
     def __init__(self):
         super(DicomAnonWidget, self).__init__()
