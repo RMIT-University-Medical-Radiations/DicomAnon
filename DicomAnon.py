@@ -294,6 +294,17 @@ class DicomAnonWidget(QWidget):
                 print('patient ID {} not seen previously - adding new anon ID {} directory'.format(patient_id, anon_patient_id))
         return new_patient, anon_patient_id
 
+    def _parse_patient_id(self, patient_dir):
+        parts = patient_dir.split('_')
+        if len(parts) < 2:
+            raise ValueError(f"Expected '<patientID>_<name>' format: '{patient_dir}'")
+
+        patient_str = parts[0]
+        if not patient_str.isdigit():
+            raise ValueError(f"Patient ID is not numeric: '{patient_str}'")
+
+        return int(patient_str)
+
     # process all DICOMs under the selected top-level folder containing patient folders
     def process_folder(self, source_base_dir, destination_base_dir, mapping_df):
         # update the status bar
@@ -316,7 +327,15 @@ class DicomAnonWidget(QWidget):
         for patient_dir_idx,patient_dir in enumerate(patient_dirs_l):
             valid_file_count = 0
             invalid_file_count = 0
-            patient_id = int(patient_dir.split('_')[0])
+            try:
+                patient_id = self._parse_patient_id(patient_dir)
+            except Exception as e:
+                msg = QMessageBox()
+                msg.setIcon(QMessageBox.Icon.Warning)
+                msg.setText(f"Error parsing patient ID: {e}")
+                msg.setWindowTitle("Error")
+                msg.exec()
+                break
             new_patient, anon_patient_id = self.get_anon_patient_id(patient_id, mapping_df)
             anon_patient_folder_name = 'Brain-{:04d}'.format(anon_patient_id)
             anon_patient_dir = destination_base_dir + os.sep + anon_patient_folder_name
