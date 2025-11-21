@@ -4,13 +4,66 @@ This is a repository for a DICOM anonymiser, deftly named DicomAnon. Although th
 <img width="712" alt="DicomAnon screen shot" src="https://github.com/RMIT-University-Medical-Radiations/DicomAnon/assets/1016303/742f9e86-d083-413f-9635-909e5964eb2e">
 
 The DICOM files are anonymised by replacing the values of the following DICOM tags:
-* PatientName
-* PatientID
-* PatientAddress
+## Patient (except PatientName, PatientID)
+* OtherPatientIDs
+* OtherPatientNames
+* PatientBirthName
 * PatientMotherBirthName
+* PatientAddress
+* PatientTelephoneNumbers
+* PatientInsurancePlanCodeSequence
+* PatientComments
 * EthnicGroup
+* Occupation
+* AdditionalPatientHistory
+* PatientReligiousPreference
+
+## General person/organization
+* ResponsiblePerson
+* ResponsiblePersonRole
+* PersonName
+* PerformingPhysicianName
 * ReferringPhysicianName
 * ReferringPhysicianAddress
+* ReferringPhysicianTelephoneNumbers
+* RequestingPhysician
+* OperatorsName
+* PhysiciansOfRecord
+* PhysiciansReadingStudy
+
+## Institution / contact info
+* InstitutionName
+* InstitutionAddress
+* InstitutionalDepartmentName
+* StationName
+* DeviceSerialNumber
+* SoftwareVersions
+
+## Study / scheduling / admin IDs
+* AccessionNumber
+* IssuerOfPatientID
+* IssuerOfAccessionNumberSequence
+* RequestingService
+* AdmissionID
+* PatientAccountNumber
+* InsurancePlanIdentification
+* VisitComments
+* ScheduledProcedureStepDescription
+* RequestedProcedureDescription
+* RequestedProcedureID
+* RequestedProcedureLocation
+
+## Free-text descriptions
+* ProtocolName
+* PerformedProcedureStepDescription
+* StudyComments
+
+## Addresses / geographic
+* CountryOfResidence
+* RegionOfResidence
+* PatientMotherBirthName
+
+Further, it recursively remaps all UIDs in the dataset (and sequences), except SOPClassUIDs. The reason for doing this is so that even if the anoymised DICOMs are loaded back into the system at their originating institution, the patient could still not be identified.
 
 On completion, DicomAnon will save as an Excel spreadsheet in your home folder a mapping of the true patient IDs to anonymised patient IDs.
 
